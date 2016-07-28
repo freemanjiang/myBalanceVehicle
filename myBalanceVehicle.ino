@@ -119,7 +119,7 @@ MPU6050 mpu;
 
 double Setpoint, Input, Output;
 PID myPID(&Input, &Output, &Setpoint, 2, 280, 0.01, DIRECT);
-unsigned long count = 0;
+double count = 0;
 
 
 #define INTERRUPT_PIN 3  // use pin 2 on Arduino Uno & most boards
@@ -159,7 +159,14 @@ void dmpDataReady() {
 
 void myisr(void)
 {
-  count++;
+  if (Output < 0)
+  {
+    count--;
+  }
+  else
+  {
+    count++;
+  }
 }
 
 // ================================================================
@@ -174,6 +181,7 @@ void setup() {
   Setpoint = 5000;
   myPID.SetMode(AUTOMATIC);
   myPID.SetSampleTime(10);//PID 采样周期 10ms
+  myPID.SetOutputLimits(-255, 255);
 
 
   // join I2C bus (I2Cdev library doesn't do this automatically)
@@ -262,10 +270,10 @@ void setup() {
 
 unsigned long lastt1 = 0;
 unsigned long lastt2 = 0;
-unsigned long lastCount1 = 0;
-unsigned long lastCount2 = 0;
+double lastCount1 = 0;
+double lastCount2 = 0;
 int in = 0;
-unsigned long rpm = 0;
+double rpm = 0;
 
 // ================================================================
 // ===                    MAIN PROGRAM LOOP                     ===
@@ -344,12 +352,12 @@ void loop() {
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    Serial.print("!");
-    Serial.print(ypr[0] * 180 / M_PI);
-    Serial.print("#");
-    Serial.print(ypr[1] * 180 / M_PI);
-    Serial.print("#");
-    Serial.println(ypr[2] * 180 / M_PI);
+    //    Serial.print("!");
+    //    Serial.print(ypr[0] * 180 / M_PI);
+    //    Serial.print("#");
+    //    Serial.print(ypr[1] * 180 / M_PI);
+    //    Serial.print("#");
+    //    Serial.println(ypr[2] * 180 / M_PI);
 #endif
 
 #ifdef OUTPUT_READABLE_REALACCEL
@@ -408,20 +416,18 @@ void loop() {
     lastt1 = millis();
     Input = count - lastCount1;
     lastCount1 = count;
-//    Serial.print("I=");
-//    Serial.print(Input);
-//    Serial.print("\tS=");
+    Serial.print("I=");
+    Serial.print(Input);
+    Serial.print("\tS=");
     in = analogRead(A0);//电位器输入 Setpoint
-    //in = map(in, 0, 1023, 0, 13);//10ms内，电机最大转速，码盘最多能产生13个脉冲
-
-    in = map(ypr[2] * 180 / M_PI,0,90,0,26);
-    
+    in = map(in, 0, 1023, -13, 13);//10ms内，电机最大转速，码盘最多能产生13个脉冲
+    //in = map(ypr[2] * 180 / M_PI,0,90,0,26);
     Setpoint = in;
-//    Serial.print(Setpoint);
-//    Serial.print("\tO=");
-//    Serial.print(Output);
-//    Serial.print("\trpm=");
-//    Serial.println(rpm);
+    Serial.print(Setpoint);
+    Serial.print("\tO=");
+    Serial.print(Output);
+    Serial.print("\trpm=");
+    Serial.println(rpm);
   }
   if (millis() - lastt2 >= 500)//500ms 做一次RPM计算
   {
@@ -430,7 +436,18 @@ void loop() {
     lastCount2 = count;
   }
   myPID.Compute();
-  analogWrite(6, LOW);
-  analogWrite(5, Output);
-  
+  if (Output < 0)
+  {
+    // Serial.print("[reverse]");
+    analogWrite(6, -Output);
+    analogWrite(5, LOW);
+  }
+  else
+  {
+    // Serial.print("[ppppp]");
+    analogWrite(6, LOW);
+    analogWrite(5, Output);
+  }
+
+
 }
