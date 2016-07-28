@@ -420,8 +420,8 @@ void loop() {
     Serial.print(Input);
     Serial.print("\tS=");
     in = analogRead(A0);//电位器输入 Setpoint
-    in = map(in, 0, 1023, -13, 13);//10ms内，电机最大转速，码盘最多能产生13个脉冲
-    //in = map(ypr[2] * 180 / M_PI,0,90,0,26);
+    //in = map(in, 0, 1023, -13, 13);//10ms内，电机最大转速，码盘最多能产生13个脉冲
+    in = map(ypr[2] * 180 / M_PI,-15,15,-20,20);
     Setpoint = in;
     Serial.print(Setpoint);
     Serial.print("\tO=");
