@@ -1,3 +1,8 @@
+#include <PinChangeInterrupt.h>
+#include <PinChangeInterruptBoards.h>
+#include <PinChangeInterruptPins.h>
+#include <PinChangeInterruptSettings.h>
+
 // I2C device class (I2Cdev) demonstration Arduino sketch for MPU6050 class using DMP (MotionApps v2.0)
 // 6/21/2012 by Jeff Rowberg <jeff@rowberg.net>
 // Updates should (hopefully) always be available at https://github.com/jrowberg/i2cdevlib
@@ -122,7 +127,7 @@ PID myPID(&Input, &Output, &Setpoint, 2, 280, 0.01, DIRECT);
 double count = 0;
 
 
-#define INTERRUPT_PIN 3  // use pin 2 on Arduino Uno & most boards
+#define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards// On Pro Micro, move it to pin 7.
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 bool blinkState = false;
 
@@ -176,8 +181,12 @@ void myisr(void)
 void setup() {
   pinMode(5, OUTPUT);
   pinMode(6, OUTPUT);
+  pinMode(8, INPUT_PULLUP);//one wheel speed detect , Pin Change Interrupt
+  //pinMode(9, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
 
-  attachInterrupt(digitalPinToInterrupt(2), myisr, RISING );
+  //attachInterrupt(digitalPinToInterrupt(2), myisr, RISING );
+  attachPCINT(digitalPinToPCINT(8), myisr, RISING);
+
   Setpoint = 5000;
   myPID.SetMode(AUTOMATIC);
   myPID.SetSampleTime(10);//PID 采样周期 10ms
@@ -245,7 +254,8 @@ void setup() {
 
     // enable Arduino interrupt detection
     //Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
-    attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
+    attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);//pin 2, dmp detect Angle
+    
     mpuIntStatus = mpu.getIntStatus();
 
     // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -421,7 +431,7 @@ void loop() {
     Serial.print("\tS=");
     in = analogRead(A0);//电位器输入 Setpoint
     //in = map(in, 0, 1023, -13, 13);//10ms内，电机最大转速，码盘最多能产生13个脉冲
-    in = map(ypr[2] * 180 / M_PI,-15,15,-20,20);
+    in = map(ypr[2] * 180 / M_PI, -15, 15, -20, 20);
     Setpoint = in;
     Serial.print(Setpoint);
     Serial.print("\tO=");
