@@ -125,6 +125,7 @@ MPU6050 mpu;
 double Setpoint, Input, Output;
 PID myPID(&Input, &Output, &Setpoint, 2, 280, 0.01, DIRECT);
 double count = 0;
+double count2 = 0;
 
 
 #define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards// On Pro Micro, move it to pin 7.
@@ -174,6 +175,18 @@ void myisr(void)
   }
 }
 
+void myisr2(void)
+{
+  if (Output < 0)
+  {
+    count2--;
+  }
+  else
+  {
+    count2++;
+  }
+}
+
 // ================================================================
 // ===                      INITIAL SETUP                       ===
 // ================================================================
@@ -181,11 +194,16 @@ void myisr(void)
 void setup() {
   pinMode(5, OUTPUT);
   pinMode(6, OUTPUT);
+  pinMode(10, OUTPUT);//one wheel speed detect , Pin Change Interrupt
+  pinMode(11, OUTPUT);//another wheel speed detect , Pin Change Interrupt
+
+  
   pinMode(8, INPUT_PULLUP);//one wheel speed detect , Pin Change Interrupt
-  //pinMode(9, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
+  pinMode(9, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
 
   //attachInterrupt(digitalPinToInterrupt(2), myisr, RISING );
   attachPCINT(digitalPinToPCINT(8), myisr, RISING);
+  attachPCINT(digitalPinToPCINT(9), myisr2, RISING);
 
   Setpoint = 5000;
   myPID.SetMode(AUTOMATIC);
@@ -255,7 +273,7 @@ void setup() {
     // enable Arduino interrupt detection
     //Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
     attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);//pin 2, dmp detect Angle
-    
+
     mpuIntStatus = mpu.getIntStatus();
 
     // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -451,13 +469,17 @@ void loop() {
     // Serial.print("[reverse]");
     analogWrite(6, -Output);
     analogWrite(5, LOW);
+
+    analogWrite(11, -Output);
+    analogWrite(10, LOW);
   }
   else
   {
     // Serial.print("[ppppp]");
     analogWrite(6, LOW);
     analogWrite(5, Output);
+    
+    analogWrite(11, LOW);
+    analogWrite(10, Output);
   }
-
-
 }
