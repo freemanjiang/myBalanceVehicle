@@ -460,9 +460,13 @@ void loop() {
   {
     lastRpmMeasure = millis();
     rpmR = (countR - lastCountR) * 24;
+    rpmL = (countL - lastCountL) * 24;
     lastCountR = countR;
+    lastCountL = countL;
   }
+  
   myPID.Compute();
+  
   if (Output < 0)
   {
     analogWrite(5, LOW);
