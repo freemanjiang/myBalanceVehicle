@@ -124,11 +124,13 @@ MPU6050 mpu;
 
 double Setpoint, Input, Output;
 PID myPID(&Input, &Output, &Setpoint, 2, 280, 0.01, DIRECT);
-double count = 0;
-double count2 = 0;
+double countR = 0;
+double countL = 0;
 
 
-#define INTERRUPT_PIN 7  // use pin 2 on Arduino Uno & most boards// On Pro Micro, move it to pin 7.
+#define MPU_6050_INTERRUPT_PIN 7  // use pin 2 on Arduino Uno & most boards// On Pro Micro, move it to pin 7.
+#define WHEEL_R_PCINT_PIN 8
+#define WHEEL_L_PCINT_PIN 15
 #define LED_PIN 14 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 bool blinkState = false;
 
@@ -163,27 +165,27 @@ void dmpDataReady() {
   mpuInterrupt = true;
 }
 
-void myisr(void)
+void wheelR(void)
 {
   if (Output < 0)
   {
-    count--;
+    countR--;
   }
   else
   {
-    count++;
+    countR++;
   }
 }
 
-void myisr2(void)
+void wheelL(void)
 {
   if (Output < 0)
   {
-    count2--;
+    countL--;
   }
   else
   {
-    count2++;
+    countL++;
   }
 }
 
@@ -192,18 +194,16 @@ void myisr2(void)
 // ================================================================
 
 void setup() {
-  pinMode(5, OUTPUT);
-  pinMode(6, OUTPUT);
-  pinMode(10, OUTPUT);//one wheel speed detect , Pin Change Interrupt
-  pinMode(9, OUTPUT);//another wheel speed detect , Pin Change Interrupt
+  pinMode(5, OUTPUT); //WHEEL R
+  pinMode(6, OUTPUT); //WHEEL R
+  pinMode(10, OUTPUT);//WHEEL L
+  pinMode(9, OUTPUT); //WHEEL L
 
+  pinMode(WHEEL_R_PCINT_PIN, INPUT_PULLUP);//one wheel speed detect , Pin Change Interrupt
+  pinMode(WHEEL_L_PCINT_PIN, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
 
-  pinMode(8, INPUT_PULLUP);//one wheel speed detect , Pin Change Interrupt
-  pinMode(15, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
-
-  //attachInterrupt(digitalPinToInterrupt(2), myisr, RISING );
-  attachPCINT(digitalPinToPCINT(8), myisr, RISING);
-  attachPCINT(digitalPinToPCINT(15), myisr2, RISING);
+  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN), wheelR, RISING);
+  attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN), wheelL, RISING);
 
   Setpoint = 5000;
   myPID.SetMode(AUTOMATIC);
@@ -234,7 +234,7 @@ void setup() {
   // initialize device
   //Serial.println(F("Initializing I2C devices..."));
   mpu.initialize();
-  pinMode(INTERRUPT_PIN, INPUT);
+  pinMode(MPU_6050_INTERRUPT_PIN, INPUT);
 
   // verify connection
   //Serial.println(F("Testing device connections..."));
@@ -272,7 +272,7 @@ void setup() {
 
     // enable Arduino interrupt detection
     //Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
-    attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);//pin 2, dmp detect Angle
+    attachInterrupt(digitalPinToInterrupt(MPU_6050_INTERRUPT_PIN), dmpDataReady, RISING);//pin 2, dmp detect Angle
 
     mpuIntStatus = mpu.getIntStatus();
 
@@ -297,11 +297,11 @@ void setup() {
 }
 
 unsigned long lastt1 = 0;
-unsigned long lastt2 = 0;
-double lastCount1 = 0;
-double lastCount2 = 0;
+unsigned long lastRpmMeasure = 0;
+double lastCount10ms = 0;
+double lastCountR = 0;
 int in = 0;
-double rpm = 0;
+double rpmR = 0;
 
 // ================================================================
 // ===                    MAIN PROGRAM LOOP                     ===
@@ -437,13 +437,12 @@ void loop() {
     digitalWrite(LED_PIN, blinkState);
   }
 
-
-
+  //motors control
   if (millis() - lastt1 >= 10)//10ms 获取一次Input,并更新Setpoint
   {
     lastt1 = millis();
-    Input = count - lastCount1;
-    lastCount1 = count;
+    Input = countR - lastCount10ms;
+    lastCount10ms = countR;
     Serial.print("I=");
     Serial.print(Input);
     Serial.print("\tS=");
@@ -454,19 +453,18 @@ void loop() {
     Serial.print(Setpoint);
     Serial.print("\tO=");
     Serial.print(Output);
-    Serial.print("\trpm=");
-    Serial.println(rpm);
+    Serial.print("\trpmR=");
+    Serial.println(rpmR);
   }
-  if (millis() - lastt2 >= 500)//500ms 做一次RPM计算
+  if (millis() - lastRpmMeasure >= 500)//500ms 做一次RPM计算
   {
-    lastt2 = millis();
-    rpm = (count - lastCount2) * 24;
-    lastCount2 = count;
+    lastRpmMeasure = millis();
+    rpmR = (countR - lastCountR) * 24;
+    lastCountR = countR;
   }
   myPID.Compute();
   if (Output < 0)
   {
-    // Serial.print("[reverse]");
     analogWrite(5, LOW);
     analogWrite(6, -Output);
 
@@ -475,7 +473,6 @@ void loop() {
   }
   else
   {
-    // Serial.print("[ppppp]");
     analogWrite(5, Output);
     analogWrite(6, LOW);
 
