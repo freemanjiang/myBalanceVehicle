@@ -300,8 +300,10 @@ unsigned long lastt1 = 0;
 unsigned long lastRpmMeasure = 0;
 double lastCount10ms = 0;
 double lastCountR = 0;
+double lastCountL = 0;
 int in = 0;
 double rpmR = 0;
+double rpmL = 0;
 
 // ================================================================
 // ===                    MAIN PROGRAM LOOP                     ===
@@ -464,9 +466,9 @@ void loop() {
     lastCountR = countR;
     lastCountL = countL;
   }
-  
+
   myPID.Compute();
-  
+
   if (Output < 0)
   {
     analogWrite(5, LOW);
