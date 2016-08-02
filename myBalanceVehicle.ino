@@ -128,8 +128,8 @@ double count = 0;
 double count2 = 0;
 
 
-#define INTERRUPT_PIN 2  // use pin 2 on Arduino Uno & most boards// On Pro Micro, move it to pin 7.
-#define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
+#define INTERRUPT_PIN 7  // use pin 2 on Arduino Uno & most boards// On Pro Micro, move it to pin 7.
+#define LED_PIN 14 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 bool blinkState = false;
 
 // MPU control/status vars
@@ -195,15 +195,15 @@ void setup() {
   pinMode(5, OUTPUT);
   pinMode(6, OUTPUT);
   pinMode(10, OUTPUT);//one wheel speed detect , Pin Change Interrupt
-  pinMode(11, OUTPUT);//another wheel speed detect , Pin Change Interrupt
+  pinMode(9, OUTPUT);//another wheel speed detect , Pin Change Interrupt
 
-  
+
   pinMode(8, INPUT_PULLUP);//one wheel speed detect , Pin Change Interrupt
-  pinMode(9, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
+  pinMode(15, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
 
   //attachInterrupt(digitalPinToInterrupt(2), myisr, RISING );
   attachPCINT(digitalPinToPCINT(8), myisr, RISING);
-  attachPCINT(digitalPinToPCINT(9), myisr2, RISING);
+  attachPCINT(digitalPinToPCINT(15), myisr2, RISING);
 
   Setpoint = 5000;
   myPID.SetMode(AUTOMATIC);
@@ -449,7 +449,7 @@ void loop() {
     Serial.print("\tS=");
     in = analogRead(A0);//电位器输入 Setpoint
     //in = map(in, 0, 1023, -13, 13);//10ms内，电机最大转速，码盘最多能产生13个脉冲
-    in = map(ypr[2] * 180 / M_PI, -15, 15, -20, 20);
+    in = map(ypr[1] * 180 / M_PI, -15, 15, -20, 20);
     Setpoint = in;
     Serial.print(Setpoint);
     Serial.print("\tO=");
@@ -467,19 +467,19 @@ void loop() {
   if (Output < 0)
   {
     // Serial.print("[reverse]");
-    analogWrite(6, -Output);
     analogWrite(5, LOW);
+    analogWrite(6, -Output);
 
-    analogWrite(11, -Output);
     analogWrite(10, LOW);
+    analogWrite(9, -Output);
   }
   else
   {
     // Serial.print("[ppppp]");
-    analogWrite(6, LOW);
     analogWrite(5, Output);
-    
-    analogWrite(11, LOW);
+    analogWrite(6, LOW);
+
     analogWrite(10, Output);
+    analogWrite(9, LOW);
   }
 }
