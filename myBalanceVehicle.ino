@@ -15,9 +15,14 @@ MPU6050 mpu;
 
 double Setpoint, Input, Output;
 double Setpoint_offset;
-PID myPID(&Input, &Output, &Setpoint, 50, 200, 0.22, DIRECT);
+double kp = 50.0, ki = 200.0, kd = 0.22;
+float value = 0.0;
+String inputString = "";         // a string to hold incoming data
+boolean stringComplete = false;  // whether the string is complete
+PID myPID(&Input, &Output, &Setpoint, kp, ki, kd, DIRECT);
 double countR = 0;
 double countL = 0;
+char inChar = 'x';
 
 #define MPU_6050_INTERRUPT_PIN 7  // use pin 2 on Arduino Uno & most boards// On Pro Micro, move it to pin 7.
 #define WHEEL_R_PCINT_PIN 8
@@ -105,7 +110,8 @@ void setup() {
   Fastwire::setup(400, true);
 #endif
 
-  Serial.begin(115200);
+  Serial1.begin(115200);
+  inputString.reserve(200);
   delay(200);
   mpu.initialize();
   pinMode(MPU_6050_INTERRUPT_PIN, INPUT);
@@ -180,7 +186,7 @@ void loop() {
   if ((mpuIntStatus & 0x10) || fifoCount == 1024) {
     // reset so we can continue cleanly
     mpu.resetFIFO();
-    Serial.println(F("FIFO overflow!"));
+    Serial1.println(F("FIFO overflow!"));
 
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
   } else if (mpuIntStatus & 0x02) {
@@ -216,18 +222,19 @@ void loop() {
     lastt1 = millis();
     Input = countR - lastCount10ms;
     lastCount10ms = countR;
-//    Serial.print("I=");
-//    Serial.print(Input);
-//    Serial.print("\tS=");
+    //    Serial1.print("I=");
+    //    Serial1.print(Input);
+    //    Serial1.print("\tS=");
     in = analogRead(A0);//电位器输入 Setpoint
     //in = map(in, 0, 1023, -13, 13);//10ms内，电机最大转速，码盘最多能产生13个脉冲
     in = map(ypr[1] * 180 / M_PI, -20, 20, -20, 20);
     Setpoint = in + Setpoint_offset;
-//    Serial.print(Setpoint);
-//    Serial.print("\tO=");
-//    Serial.print(Output);
-//    Serial.print("\trpmR=");
-//    Serial.println(rpmR);
+    //    Serial1.print(Setpoint);
+    //    Serial1.print("\tO=");
+    //    Serial1.print(Output);
+    //    Serial1.print("\trpmR=");
+    //    Serial1.println(rpmR);
+
   }
   if (millis() - lastRpmMeasure >= 500)//500ms 做一次RPM计算
   {
@@ -236,6 +243,14 @@ void loop() {
     rpmL = (countL - lastCountL) * 24;
     lastCountR = countR;
     lastCountL = countL;
+
+    Serial1.print(kp);
+    Serial1.print(',');
+    Serial1.print(ki);
+    Serial1.print(',');
+    Serial1.print(kd);
+    Serial1.print(',');
+    Serial1.println(Setpoint_offset);
   }
 
   myPID.Compute();
@@ -256,4 +271,52 @@ void loop() {
     analogWrite(10, Output);
     analogWrite(9, LOW);
   }
+
+  if (stringComplete) {
+    Serial1.println(inputString);
+    value = inputString.substring(inputString.indexOf('=') + 1).toFloat();
+    if (inputString.startsWith("kp="))
+    {
+      kp = value;
+    }
+    else if (inputString.startsWith("ki="))
+    {
+      ki = value;
+    }
+    else if (inputString.startsWith("kd="))
+    {
+      kd = value;
+    }
+    else if (inputString.startsWith("Soff="))
+    {
+      Setpoint_offset = value;
+    }
+
+    // clear the string:
+    inputString = "";
+    stringComplete = false;
+
+    myPID.SetTunings(kp, ki, kd);
+  }
 }
+
+/*
+  SerialEvent occurs whenever a new data comes in the
+  hardware serial RX.  This routine is run between each
+  time loop() runs, so using delay inside loop can delay
+  response.  Multiple bytes of data may be available.
+*/
+void serialEvent1() {
+  while (Serial1.available()) {
+    // get the new byte:
+    char inChar = (char)Serial1.read();
+    // add it to the inputString:
+    inputString += inChar;
+    // if the incoming character is a newline, set a flag
+    // so the main loop can do something about it:
+    if (inChar == '\n') {
+      stringComplete = true;
+    }
+  }
+}
+
