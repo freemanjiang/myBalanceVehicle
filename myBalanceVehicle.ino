@@ -216,18 +216,18 @@ void loop() {
     lastt1 = millis();
     Input = countR - lastCount10ms;
     lastCount10ms = countR;
-    Serial.print("I=");
-    Serial.print(Input);
-    Serial.print("\tS=");
+//    Serial.print("I=");
+//    Serial.print(Input);
+//    Serial.print("\tS=");
     in = analogRead(A0);//电位器输入 Setpoint
     //in = map(in, 0, 1023, -13, 13);//10ms内，电机最大转速，码盘最多能产生13个脉冲
     in = map(ypr[1] * 180 / M_PI, -20, 20, -20, 20);
     Setpoint = in + Setpoint_offset;
-    Serial.print(Setpoint);
-    Serial.print("\tO=");
-    Serial.print(Output);
-    Serial.print("\trpmR=");
-    Serial.println(rpmR);
+//    Serial.print(Setpoint);
+//    Serial.print("\tO=");
+//    Serial.print(Output);
+//    Serial.print("\trpmR=");
+//    Serial.println(rpmR);
   }
   if (millis() - lastRpmMeasure >= 500)//500ms 做一次RPM计算
   {
