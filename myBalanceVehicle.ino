@@ -203,17 +203,17 @@ void loop() {
     lastt1 = millis();
     countPer100ms = countR - lastCount100ms;
     lastCount100ms = countR;
-//    Serial1.print(Setpoint);//always 0;
-//    Serial1.print("\tO=");
-//    Serial1.print(Output);
-//    Serial1.print("\tI=");
-//    Serial1.print(Input);//angle
-//    Serial1.print("\tis=");
-//    Serial1.print(Inputs);
-//    Serial1.print("\tos=");
-//    Serial1.print(Outputs);
-//    Serial1.print("\tfo=");
-//    Serial1.println(finalOutput);
+    //    Serial1.print(Setpoint);//always 0;
+    //    Serial1.print("\tO=");
+    //    Serial1.print(Output);
+    //    Serial1.print("\tI=");
+    //    Serial1.print(Input);//angle
+    //    Serial1.print("\tis=");
+    //    Serial1.print(Inputs);
+    //    Serial1.print("\tos=");
+    //    Serial1.print(Outputs);
+    //    Serial1.print("\tfo=");
+    //    Serial1.println(finalOutput);
   }
   if (millis() - lastParamShow >= 3000)//1000ms
   {
@@ -239,13 +239,14 @@ void loop() {
   sPID.Compute();
 
   Setpoint = 0;
-  Input = angle + myparams.Setpoint_offset;
+  Input = angle;
   myPID.Compute();
   //  Serial.print(Output);
   //  Serial.print("+");
   //  Serial.print(Output);
 
   finalOutput = Output + Outputs;
+
   if (finalOutput > 255)
   {
     finalOutput = 255;
@@ -253,6 +254,11 @@ void loop() {
   else if (finalOutput < -255)
   {
     finalOutput = -255;
+  }
+
+  if (angle > 60 || angle < -60)
+  {
+    finalOutput = 0;
   }
 
   //  Serial.print("=");
