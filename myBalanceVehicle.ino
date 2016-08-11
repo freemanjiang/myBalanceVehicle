@@ -218,7 +218,7 @@ void loop() {
     //    Serial1.print("\tfo=");
     //    Serial1.println(finalOutput);
   }
-  if (millis() - lastParamShow >= 3000)//1000ms
+  if (millis() - lastParamShow >= 3000)//3000ms
   {
     lastParamShow = millis();
     EEPROM.get(0, ctlparams);
@@ -249,6 +249,7 @@ void loop() {
   {
     Outputs = 0;
   }
+  
   Setpoint = 0;
   Input = angle;
   myPID.Compute();
