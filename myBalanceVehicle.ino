@@ -1,3 +1,5 @@
+#include <EEPROM.h>
+
 #include <PinChangeInterrupt.h>
 #include <PinChangeInterruptBoards.h>
 #include <PinChangeInterruptPins.h>
@@ -13,24 +15,38 @@
 
 MPU6050 mpu;
 
+struct MyParams {
+  double kp;
+  double ki;
+  double kd;
+  double sp;
+  double si;
+  double sd;
+  double Setpoint_offset;
+};
+
 double Setpoint, Input, Output;
-double Setpoint_offset;
-double kp = 50.0, ki = 200.0, kd = 0.22;
+double Setpoints, Inputs, Outputs;
+int finalOutput;
+
+double kp = 9.0, ki = 0, kd = 0.3;
+double sp = 0.05, si = 0.003, sd = 0.0;
+double Setpoint_offset = 0.0;
+MyParams myparams = {
+  kp, ki, kd,
+  sp, si, sd, Setpoint_offset
+};
 float value = 0.0;
 String inputString = "";         // a string to hold incoming data
 boolean stringComplete = false;  // whether the string is complete
-PID myPID(&Input, &Output, &Setpoint, kp, ki, kd, DIRECT);
-double countR = 0;
-double countL = 0;
-char inChar = 'x';
-
+PID myPID(&Input, &Output,   &Setpoint, myparams.kp, myparams.ki, myparams.kd, DIRECT);
+PID sPID(&Inputs, &Outputs, &Setpoints, myparams.sp, myparams.si, myparams.sd, REVERSE);
+int countL = 0;
+int countR = 0;
 #define MPU_6050_INTERRUPT_PIN 7  // use pin 2 on Arduino Uno & most boards// On Pro Micro, move it to pin 7.
-#define WHEEL_R_PCINT_PIN 8
-#define WHEEL_L_PCINT_PIN 15
-#define LED_PIN 14 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
-bool blinkState = false;
+#define WHEEL_L_PCINT_PIN 8
+#define WHEEL_R_PCINT_PIN 15
 
-// MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
 uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
@@ -38,7 +54,6 @@ uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
 uint16_t fifoCount;     // count of all bytes currently in FIFO
 uint8_t fifoBuffer[64]; // FIFO storage buffer
 
-// orientation/motion vars
 Quaternion q;           // [w, x, y, z]         quaternion container
 VectorInt16 aa;         // [x, y, z]            accel sensor measurements
 VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
@@ -55,27 +70,27 @@ void dmpDataReady() {
   mpuInterrupt = true;
 }
 
-void wheelR(void)
-{
-  if (Output < 0)
-  {
-    countR--;
-  }
-  else
-  {
-    countR++;
-  }
-}
-
 void wheelL(void)
 {
-  if (Output < 0)
+  if (digitalRead(14))
+  {
+    countL++;
+  }
+  else
   {
     countL--;
   }
+}
+
+void wheelR(void)
+{
+  if (digitalRead(10))
+  {
+    countR++;
+  }
   else
   {
-    countL++;
+    countR--;
   }
 }
 
@@ -83,24 +98,34 @@ void wheelL(void)
 // ===                      INITIAL SETUP                       ===
 // ================================================================
 
+
 void setup() {
-  pinMode(5, OUTPUT); //WHEEL R
-  pinMode(6, OUTPUT); //WHEEL R
-  pinMode(10, OUTPUT);//WHEEL L
-  pinMode(9, OUTPUT); //WHEEL L
+  EEPROM.get(0, myparams);
 
-  pinMode(WHEEL_R_PCINT_PIN, INPUT_PULLUP);//one wheel speed detect , Pin Change Interrupt
-  pinMode(WHEEL_L_PCINT_PIN, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
+  pinMode(14, OUTPUT); //WHEEL L
+  pinMode(16, OUTPUT); //WHEEL L
+  pinMode(5, OUTPUT); //WHEEL L enable, pwm
 
-  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN), wheelR, RISING);
+  pinMode(9, OUTPUT);//WHEEL R
+  pinMode(10, OUTPUT); //WHEEL R
+  pinMode(6, OUTPUT); //WHEEL R enable, pwm
+
+  pinMode(WHEEL_L_PCINT_PIN, INPUT_PULLUP);//one wheel speed detect , Pin Change Interrupt
+  pinMode(WHEEL_R_PCINT_PIN, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
+
   attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN), wheelL, RISING);
+  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN), wheelR, RISING);
 
   Setpoint = 0;
-  Setpoint_offset = 0.0;
-  myPID.SetMode(AUTOMATIC);
-  myPID.SetSampleTime(10);//PID 采样周期 10ms
+  myPID.SetTunings(myparams.kp, myparams.ki, myparams.kd);
   myPID.SetOutputLimits(-255, 255);
+  myPID.SetSampleTime(5);//PID 采样周期 5ms
+  myPID.SetMode(AUTOMATIC);
 
+  sPID.SetTunings(myparams.sp, myparams.si, myparams.sd);
+  sPID.SetOutputLimits(-100, 100);
+  sPID.SetSampleTime(100);
+  sPID.SetMode(AUTOMATIC);
 
   // join I2C bus (I2Cdev library doesn't do this automatically)
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -135,141 +160,122 @@ void setup() {
   mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
 #endif
 
-  // make sure it worked (returns 0 if so)
   if (devStatus == 0) {
-    // turn on the DMP, now that it's ready
     mpu.setDMPEnabled(true);
     attachInterrupt(digitalPinToInterrupt(MPU_6050_INTERRUPT_PIN), dmpDataReady, RISING);//pin 2, dmp detect Angle
     mpuIntStatus = mpu.getIntStatus();
-
     dmpReady = true;
-
     packetSize = mpu.dmpGetFIFOPacketSize();
   } else {
     // ERROR!
   }
-
-  // configure LED for output
-  pinMode(LED_PIN, OUTPUT);
 }
-
 unsigned long lastt1 = 0;
-unsigned long lastRpmMeasure = 0;
-double lastCount10ms = 0;
-double lastCountR = 0;
-double lastCountL = 0;
-int in = 0;
-double rpmR = 0;
-double rpmL = 0;
-
-// ================================================================
-// ===                    MAIN PROGRAM LOOP                     ===
-// ================================================================
+unsigned long lastParamShow = 0;
+int lastCount100ms = 0;
+double angle = 0;
+int countPer100ms = 0;
 
 void loop() {
-  // if programming failed, don't try to do anything
+  //get yaw pitch roll
   if (!dmpReady) return;
-
-  // wait for MPU interrupt or extra packet(s) available
   while (!mpuInterrupt && fifoCount < packetSize) {
-    // other program behavior stuff here
   }
-
-  // reset interrupt flag and get INT_STATUS byte
   mpuInterrupt = false;
   mpuIntStatus = mpu.getIntStatus();
-
-  // get current FIFO count
   fifoCount = mpu.getFIFOCount();
-
-  // check for overflow (this should never happen unless our code is too inefficient)
   if ((mpuIntStatus & 0x10) || fifoCount == 1024) {
-    // reset so we can continue cleanly
     mpu.resetFIFO();
     Serial1.println(F("FIFO overflow!"));
-
-    // otherwise, check for DMP data ready interrupt (this should happen frequently)
   } else if (mpuIntStatus & 0x02) {
-    // wait for correct available data length, should be a VERY short wait
     while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
-
-    // read a packet from FIFO
     mpu.getFIFOBytes(fifoBuffer, packetSize);
-
-    // track FIFO count here in case there is > 1 packet available
-    // (this lets us immediately read more without waiting for an interrupt)
     fifoCount -= packetSize;
-
-    // display Euler angles in degrees
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    //    Serial.print("!");
-    //    Serial.print(ypr[0] * 180 / M_PI);
-    //    Serial.print("#");
-    //    Serial.print(ypr[1] * 180 / M_PI);
-    //    Serial.print("#");
-    //    Serial.println(ypr[2] * 180 / M_PI);
-
-    // blink LED to indicate activity
-    blinkState = !blinkState;
-    digitalWrite(LED_PIN, blinkState);
+    angle = -ypr[1] * 180 / M_PI;
   }
 
   //motors control
-  if (millis() - lastt1 >= 10)//10ms 获取一次Input,并更新Setpoint
+  if (millis() - lastt1 >= 100)//100ms 获取一次Input,并更新Setpoint
   {
     lastt1 = millis();
-    Input = countR - lastCount10ms;
-    lastCount10ms = countR;
-    //    Serial1.print("I=");
-    //    Serial1.print(Input);
-    //    Serial1.print("\tS=");
-    in = analogRead(A0);//电位器输入 Setpoint
-    //in = map(in, 0, 1023, -13, 13);//10ms内，电机最大转速，码盘最多能产生13个脉冲
-    in = map(ypr[1] * 180 / M_PI, -20, 20, -20, 20);
-    Setpoint = in + Setpoint_offset;
-    //    Serial1.print(Setpoint);
-    //    Serial1.print("\tO=");
-    //    Serial1.print(Output);
-    //    Serial1.print("\trpmR=");
-    //    Serial1.println(rpmR);
-
+    countPer100ms = countR - lastCount100ms;
+    lastCount100ms = countR;
+    Serial1.print(Setpoint);//always 0;
+    Serial1.print("\tO=");
+    Serial1.print(Output);
+    Serial1.print("\tI=");
+    Serial1.print(Input);//angle
+    Serial1.print("\tis=");
+    Serial1.print(Inputs);
+    Serial1.print("\tos=");
+    Serial1.print(Outputs);
+    Serial1.print("\tfo=");
+    Serial1.println(finalOutput);
   }
-  if (millis() - lastRpmMeasure >= 500)//500ms 做一次RPM计算
+  if (millis() - lastParamShow >= 3000)//1000ms
   {
-    lastRpmMeasure = millis();
-    rpmR = (countR - lastCountR) * 24;
-    rpmL = (countL - lastCountL) * 24;
-    lastCountR = countR;
-    lastCountL = countL;
-
-    Serial1.print(kp);
+    lastParamShow = millis();
+    EEPROM.get(0, myparams);
+    Serial1.print(myparams.kp);
     Serial1.print(',');
-    Serial1.print(ki);
+    Serial1.print(myparams.ki);
     Serial1.print(',');
-    Serial1.print(kd);
+    Serial1.print(myparams.kd);
+    Serial1.print('\t');
+    Serial1.print(myparams.sp);
     Serial1.print(',');
-    Serial1.println(Setpoint_offset);
+    Serial1.print(myparams.si);
+    Serial1.print(',');
+    Serial1.print(myparams.sd);
+    Serial1.print('\t');
+    Serial1.println(myparams.Setpoint_offset);
   }
 
+  Setpoints = 0;
+  Inputs = countPer100ms;
+  sPID.Compute();
+
+  Setpoint = 0;
+  Input = angle + Setpoint_offset;
   myPID.Compute();
+  //  Serial.print(Output);
+  //  Serial.print("+");
+  //  Serial.print(Output);
 
-  if (Output < 0)
+  finalOutput = Output + Outputs;
+  if (finalOutput > 255)
   {
-    analogWrite(5, LOW);
-    analogWrite(6, -Output);
+    finalOutput = 255;
+  }
+  else if (finalOutput < -255)
+  {
+    finalOutput = -255;
+  }
 
-    analogWrite(10, LOW);
-    analogWrite(9, -Output);
+  //  Serial.print("=");
+  //  Serial.println(finalOutput);
+  if (finalOutput < 0)
+  { //backward
+    digitalWrite(14, LOW);
+    digitalWrite(16, HIGH);
+    analogWrite(5, -finalOutput);
+
+    digitalWrite(9, HIGH);
+    digitalWrite(10, LOW);
+    analogWrite(6, -finalOutput);
   }
   else
-  {
-    analogWrite(5, Output);
-    analogWrite(6, LOW);
+  { //forwared
+    digitalWrite(14, HIGH);
+    digitalWrite(16, LOW);
+    analogWrite(5, finalOutput);
 
-    analogWrite(10, Output);
-    analogWrite(9, LOW);
+    digitalWrite(9, LOW);
+    digitalWrite(10, HIGH);
+    analogWrite(6, finalOutput);
   }
 
   if (stringComplete) {
@@ -277,26 +283,39 @@ void loop() {
     value = inputString.substring(inputString.indexOf('=') + 1).toFloat();
     if (inputString.startsWith("kp="))
     {
-      kp = value;
+      myparams.kp = value;
     }
     else if (inputString.startsWith("ki="))
     {
-      ki = value;
+      myparams.ki = value;
     }
     else if (inputString.startsWith("kd="))
     {
-      kd = value;
+      myparams.kd = value;
     }
-    else if (inputString.startsWith("Soff="))
+    else if (inputString.startsWith("sp="))
     {
-      Setpoint_offset = value;
+      myparams.sp = value;
     }
-
+    else if (inputString.startsWith("si="))
+    {
+      myparams.si = value;
+    }
+    else if (inputString.startsWith("sd="))
+    {
+      myparams.sd = value;
+    }
+    else if (inputString.startsWith("off="))//setpoint offset
+    {
+      myparams.Setpoint_offset = value;
+    }
     // clear the string:
     inputString = "";
     stringComplete = false;
 
-    myPID.SetTunings(kp, ki, kd);
+    sPID.SetTunings(myparams.sp, myparams.si, myparams.sd);
+    myPID.SetTunings(myparams.kp, myparams.ki, myparams.kd);
+    EEPROM.put(0, myparams);
   }
 }
 
@@ -319,4 +338,3 @@ void serialEvent1() {
     }
   }
 }
-
