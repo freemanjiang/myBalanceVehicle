@@ -175,9 +175,9 @@ void setup() {
 }
 unsigned long lastt1 = 0;
 unsigned long lastParamShow = 0;
-int lastCount100ms = 0;
+int lastCount = 0;
 double angle = 0;
-int countPer100ms = 0;
+int CountDelta = 0;
 
 void loop() {
   //get yaw pitch roll
@@ -204,8 +204,8 @@ void loop() {
   if (millis() - lastt1 >= 100)//100ms 
   {
     lastt1 = millis();
-    countPer100ms = countR - lastCount100ms;
-    lastCount100ms = countR;
+    CountDelta = countR - lastCount;
+    lastCount = countR;
     //    Serial1.print(Setpoint);//always 0;
     //    Serial1.print("\tO=");
     //    Serial1.print(Output);
@@ -240,7 +240,7 @@ void loop() {
   }
 
   Setpoints = 0;
-  Inputs = countPer100ms;
+  Inputs = CountDelta;
   if (ctlparams.speedPidOn)
   {
     sPID.Compute();
