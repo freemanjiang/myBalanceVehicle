@@ -23,18 +23,21 @@ struct MyParams {
   double si;
   double sd;
   double Setpoint_offset;
+  int speedPidOn;//1:on   0:off
 };
 
 double Setpoint, Input, Output;
 double Setpoints, Inputs, Outputs;
 int finalOutput;
 
-double kp = 9.0, ki = 0, kd = 0.3;
-double sp = 0.05, si = 0.003, sd = 0.0;
-double Setpoint_offset = -0.5;
+double kp = 12.6, ki = 0, kd = 0.135;
+double sp = 0.54, si = 0.0025, sd = 0.0;
+double Setpoint_offset = -0.95;
 MyParams myparams = {
   kp, ki, kd,
-  sp, si, sd, Setpoint_offset
+  sp, si, sd,
+  Setpoint_offset,
+  1
 };
 float value = 0.0;
 String inputString = "";         // a string to hold incoming data
@@ -231,13 +234,21 @@ void loop() {
     Serial1.print(',');
     Serial1.print(myparams.sd, 5);
     Serial1.print('\t');
-    Serial1.println(myparams.Setpoint_offset);
+    Serial1.print(myparams.Setpoint_offset);
+    Serial1.print('\t');
+    Serial1.println(myparams.speedPidOn);
   }
 
   Setpoints = 0;
   Inputs = countPer100ms;
-  sPID.Compute();
-
+  if (myparams.speedPidOn)
+  {
+    sPID.Compute();
+  }
+  else
+  {
+    Outputs = 0;
+  }
   Setpoint = 0;
   Input = angle;
   myPID.Compute();
@@ -315,6 +326,10 @@ void loop() {
     {
       myparams.Setpoint_offset = value;
     }
+    else if (inputString.startsWith("spid="))//setpoint offset
+    {
+      myparams.speedPidOn = (int)value;
+    }    
     // clear the string:
     inputString = "";
     stringComplete = false;
