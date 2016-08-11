@@ -31,7 +31,7 @@ int finalOutput;
 
 double kp = 9.0, ki = 0, kd = 0.3;
 double sp = 0.05, si = 0.003, sd = 0.0;
-double Setpoint_offset = 0.0;
+double Setpoint_offset = -0.5;
 MyParams myparams = {
   kp, ki, kd,
   sp, si, sd, Setpoint_offset
@@ -194,7 +194,7 @@ void loop() {
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    angle = -ypr[1] * 180 / M_PI;
+    angle = -(ypr[1] * 180 / M_PI - myparams.Setpoint_offset);
   }
 
   //motors control
@@ -239,7 +239,7 @@ void loop() {
   sPID.Compute();
 
   Setpoint = 0;
-  Input = angle + Setpoint_offset;
+  Input = angle + myparams.Setpoint_offset;
   myPID.Compute();
   //  Serial.print(Output);
   //  Serial.print("+");
