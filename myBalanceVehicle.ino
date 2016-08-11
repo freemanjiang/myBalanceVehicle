@@ -203,33 +203,33 @@ void loop() {
     lastt1 = millis();
     countPer100ms = countR - lastCount100ms;
     lastCount100ms = countR;
-    Serial1.print(Setpoint);//always 0;
-    Serial1.print("\tO=");
-    Serial1.print(Output);
-    Serial1.print("\tI=");
-    Serial1.print(Input);//angle
-    Serial1.print("\tis=");
-    Serial1.print(Inputs);
-    Serial1.print("\tos=");
-    Serial1.print(Outputs);
-    Serial1.print("\tfo=");
-    Serial1.println(finalOutput);
+//    Serial1.print(Setpoint);//always 0;
+//    Serial1.print("\tO=");
+//    Serial1.print(Output);
+//    Serial1.print("\tI=");
+//    Serial1.print(Input);//angle
+//    Serial1.print("\tis=");
+//    Serial1.print(Inputs);
+//    Serial1.print("\tos=");
+//    Serial1.print(Outputs);
+//    Serial1.print("\tfo=");
+//    Serial1.println(finalOutput);
   }
   if (millis() - lastParamShow >= 3000)//1000ms
   {
     lastParamShow = millis();
     EEPROM.get(0, myparams);
-    Serial1.print(myparams.kp);
+    Serial1.print(myparams.kp, 5);
     Serial1.print(',');
-    Serial1.print(myparams.ki);
+    Serial1.print(myparams.ki, 5);
     Serial1.print(',');
-    Serial1.print(myparams.kd);
+    Serial1.print(myparams.kd, 5);
     Serial1.print('\t');
-    Serial1.print(myparams.sp);
+    Serial1.print(myparams.sp, 5);
     Serial1.print(',');
-    Serial1.print(myparams.si);
+    Serial1.print(myparams.si, 5);
     Serial1.print(',');
-    Serial1.print(myparams.sd);
+    Serial1.print(myparams.sd, 5);
     Serial1.print('\t');
     Serial1.println(myparams.Setpoint_offset);
   }
