@@ -15,7 +15,7 @@
 
 MPU6050 mpu;
 
-struct MyParams {
+struct ControlParams {
   double kp;
   double ki;
   double kd;
@@ -33,7 +33,7 @@ int finalOutput;
 double kp = 12.6, ki = 0, kd = 0.135;
 double sp = 0.54, si = 0.0025, sd = 0.0;
 double Setpoint_offset = -0.95;
-MyParams myparams = {
+ControlParams ctlparams = {
   kp, ki, kd,
   sp, si, sd,
   Setpoint_offset,
@@ -42,8 +42,8 @@ MyParams myparams = {
 float value = 0.0;
 String inputString = "";         // a string to hold incoming data
 boolean stringComplete = false;  // whether the string is complete
-PID myPID(&Input, &Output,   &Setpoint, myparams.kp, myparams.ki, myparams.kd, DIRECT);
-PID sPID(&Inputs, &Outputs, &Setpoints, myparams.sp, myparams.si, myparams.sd, REVERSE);
+PID myPID(&Input, &Output,   &Setpoint, ctlparams.kp, ctlparams.ki, ctlparams.kd, DIRECT);
+PID sPID(&Inputs, &Outputs, &Setpoints, ctlparams.sp, ctlparams.si, ctlparams.sd, REVERSE);
 int countL = 0;
 int countR = 0;
 #define MPU_6050_INTERRUPT_PIN 7  // use pin 2 on Arduino Uno & most boards// On Pro Micro, move it to pin 7.
@@ -103,7 +103,7 @@ void wheelR(void)
 
 
 void setup() {
-  EEPROM.get(0, myparams);
+  EEPROM.get(0, ctlparams);
 
   pinMode(14, OUTPUT); //WHEEL L
   pinMode(16, OUTPUT); //WHEEL L
@@ -120,12 +120,12 @@ void setup() {
   attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN), wheelR, RISING);
 
   Setpoint = 0;
-  myPID.SetTunings(myparams.kp, myparams.ki, myparams.kd);
+  myPID.SetTunings(ctlparams.kp, ctlparams.ki, ctlparams.kd);
   myPID.SetOutputLimits(-255, 255);
   myPID.SetSampleTime(5);//PID 采样周期 5ms
   myPID.SetMode(AUTOMATIC);
 
-  sPID.SetTunings(myparams.sp, myparams.si, myparams.sd);
+  sPID.SetTunings(ctlparams.sp, ctlparams.si, ctlparams.sd);
   sPID.SetOutputLimits(-100, 100);
   sPID.SetSampleTime(100);
   sPID.SetMode(AUTOMATIC);
@@ -197,11 +197,11 @@ void loop() {
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    angle = -(ypr[1] * 180 / M_PI - myparams.Setpoint_offset);
+    angle = -(ypr[1] * 180 / M_PI - ctlparams.Setpoint_offset);
   }
 
   //motors control
-  if (millis() - lastt1 >= 100)//100ms 获取一次Input,并更新Setpoint
+  if (millis() - lastt1 >= 100)//100ms 
   {
     lastt1 = millis();
     countPer100ms = countR - lastCount100ms;
@@ -221,27 +221,27 @@ void loop() {
   if (millis() - lastParamShow >= 3000)//1000ms
   {
     lastParamShow = millis();
-    EEPROM.get(0, myparams);
-    Serial1.print(myparams.kp, 5);
+    EEPROM.get(0, ctlparams);
+    Serial1.print(ctlparams.kp, 5);
     Serial1.print(',');
-    Serial1.print(myparams.ki, 5);
+    Serial1.print(ctlparams.ki, 5);
     Serial1.print(',');
-    Serial1.print(myparams.kd, 5);
+    Serial1.print(ctlparams.kd, 5);
     Serial1.print('\t');
-    Serial1.print(myparams.sp, 5);
+    Serial1.print(ctlparams.sp, 5);
     Serial1.print(',');
-    Serial1.print(myparams.si, 5);
+    Serial1.print(ctlparams.si, 5);
     Serial1.print(',');
-    Serial1.print(myparams.sd, 5);
+    Serial1.print(ctlparams.sd, 5);
     Serial1.print('\t');
-    Serial1.print(myparams.Setpoint_offset);
+    Serial1.print(ctlparams.Setpoint_offset);
     Serial1.print('\t');
-    Serial1.println(myparams.speedPidOn);
+    Serial1.println(ctlparams.speedPidOn);
   }
 
   Setpoints = 0;
   Inputs = countPer100ms;
-  if (myparams.speedPidOn)
+  if (ctlparams.speedPidOn)
   {
     sPID.Compute();
   }
@@ -300,43 +300,43 @@ void loop() {
     value = inputString.substring(inputString.indexOf('=') + 1).toFloat();
     if (inputString.startsWith("kp="))
     {
-      myparams.kp = value;
+      ctlparams.kp = value;
     }
     else if (inputString.startsWith("ki="))
     {
-      myparams.ki = value;
+      ctlparams.ki = value;
     }
     else if (inputString.startsWith("kd="))
     {
-      myparams.kd = value;
+      ctlparams.kd = value;
     }
     else if (inputString.startsWith("sp="))
     {
-      myparams.sp = value;
+      ctlparams.sp = value;
     }
     else if (inputString.startsWith("si="))
     {
-      myparams.si = value;
+      ctlparams.si = value;
     }
     else if (inputString.startsWith("sd="))
     {
-      myparams.sd = value;
+      ctlparams.sd = value;
     }
     else if (inputString.startsWith("off="))//setpoint offset
     {
-      myparams.Setpoint_offset = value;
+      ctlparams.Setpoint_offset = value;
     }
     else if (inputString.startsWith("spid="))//setpoint offset
     {
-      myparams.speedPidOn = (int)value;
+      ctlparams.speedPidOn = (int)value;
     }    
     // clear the string:
     inputString = "";
     stringComplete = false;
 
-    sPID.SetTunings(myparams.sp, myparams.si, myparams.sd);
-    myPID.SetTunings(myparams.kp, myparams.ki, myparams.kd);
-    EEPROM.put(0, myparams);
+    sPID.SetTunings(ctlparams.sp, ctlparams.si, ctlparams.sd);
+    myPID.SetTunings(ctlparams.kp, ctlparams.ki, ctlparams.kd);
+    EEPROM.put(0, ctlparams);
   }
 }
 
