@@ -22,7 +22,7 @@ struct ControlParams {
   double sp;
   double si;
   double sd;
-  double Setpoint_offset;
+  double angle_calibration;
   int speedPidOn;//1:on   0:off
 };
 
@@ -32,11 +32,11 @@ int finalOutput;
 
 double kp = 12.6, ki = 0, kd = 0.135;
 double sp = 0.54, si = 0.0025, sd = 0.0;
-double Setpoint_offset = -0.95;
+double angle_calibration = -0.95;
 ControlParams ctlparams = {
   kp, ki, kd,
   sp, si, sd,
-  Setpoint_offset,
+  angle_calibration,
   1
 };
 float value = 0.0;
@@ -197,7 +197,7 @@ void loop() {
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    angle = -(ypr[1] * 180 / M_PI - ctlparams.Setpoint_offset);
+    angle = -(ypr[1] * 180 / M_PI - ctlparams.angle_calibration);
   }
 
   //motors control
@@ -234,7 +234,7 @@ void loop() {
     Serial1.print(',');
     Serial1.print(ctlparams.sd, 5);
     Serial1.print('\t');
-    Serial1.print(ctlparams.Setpoint_offset);
+    Serial1.print(ctlparams.angle_calibration);
     Serial1.print('\t');
     Serial1.println(ctlparams.speedPidOn);
   }
@@ -322,9 +322,9 @@ void loop() {
     {
       ctlparams.sd = value;
     }
-    else if (inputString.startsWith("off="))//setpoint offset
+    else if (inputString.startsWith("cal="))//setpoint offset
     {
-      ctlparams.Setpoint_offset = value;
+      ctlparams.angle_calibration = value;
     }
     else if (inputString.startsWith("spid="))//setpoint offset
     {
