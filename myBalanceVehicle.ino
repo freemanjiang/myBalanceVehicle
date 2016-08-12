@@ -28,6 +28,7 @@ struct ControlParams {
 
 double Setpoint, Input, Output;
 double Setpoints, Inputs, Outputs;
+int velocity = 0;
 int finalOutput;
 
 double kp = 12.6, ki = 0, kd = 0.135;
@@ -174,6 +175,7 @@ void setup() {
   }
 }
 unsigned long lastt1 = 0;
+unsigned long lastshow = 0;
 unsigned long lastParamShow = 0;
 int lastCount = 0;
 double angle = 0;
@@ -201,22 +203,26 @@ void loop() {
   }
 
   //motors control
-  if (millis() - lastt1 >= 100)//100ms 
+  if (millis() - lastt1 >= 100)//100ms
   {
     lastt1 = millis();
     CountDelta = countR - lastCount;
     lastCount = countR;
-    //    Serial1.print(Setpoint);//always 0;
-    //    Serial1.print("\tO=");
-    //    Serial1.print(Output);
-    //    Serial1.print("\tI=");
-    //    Serial1.print(Input);//angle
-    //    Serial1.print("\tis=");
-    //    Serial1.print(Inputs);
-    //    Serial1.print("\tos=");
-    //    Serial1.print(Outputs);
-    //    Serial1.print("\tfo=");
-    //    Serial1.println(finalOutput);
+  }
+  if (millis() - lastshow >= 600)
+  {
+    lastshow = millis();
+    Serial1.print(Setpoints);
+    Serial1.print("\tO=");
+    Serial1.print(Output);
+    Serial1.print("\tI=");
+    Serial1.print(Input);//angle
+    Serial1.print("\tis=");
+    Serial1.print(Inputs);
+    Serial1.print("\tos=");
+    Serial1.print(Outputs);
+    Serial1.print("\tfo=");
+    Serial1.println(finalOutput);
   }
   if (millis() - lastParamShow >= 3000)//3000ms
   {
@@ -239,7 +245,7 @@ void loop() {
     Serial1.println(ctlparams.speedPidOn);
   }
 
-  Setpoints = 0;
+  Setpoints = velocity;
   Inputs = CountDelta;
   if (ctlparams.speedPidOn)
   {
@@ -249,7 +255,7 @@ void loop() {
   {
     Outputs = 0;
   }
-  
+
   Setpoint = 0;
   Input = angle;
   myPID.Compute();
@@ -330,13 +336,74 @@ void loop() {
     else if (inputString.startsWith("spid="))//setpoint offset
     {
       ctlparams.speedPidOn = (int)value;
-    }    
+    }
+    else if (inputString.startsWith("v+"))//setpoint offset
+    {
+      velocity += 5;
+    }
+    else if (inputString.startsWith("v-"))//setpoint offset
+    {
+      velocity -= 5;
+    }
+    else if (inputString.startsWith("stop"))//setpoint offset
+    {
+      velocity = 0;
+    }
+    else if (inputString.startsWith("kp+"))//setpoint offset
+    {
+      ctlparams.kp += 0.5;
+    }
+    else if (inputString.startsWith("kp-"))//setpoint offset
+    {
+      ctlparams.kp -= 0.5;
+    }
+    else if (inputString.startsWith("ki+"))//setpoint offset
+    {
+      ctlparams.ki += 2;
+    }
+    else if (inputString.startsWith("ki-"))//setpoint offset
+    {
+      ctlparams.ki -= 2;
+    }
+    else if (inputString.startsWith("kd+"))//setpoint offset
+    {
+      ctlparams.kd += 0.02;
+    }
+    else if (inputString.startsWith("kd-"))//setpoint offset
+    {
+      ctlparams.kd -= 0.02;
+    }
+    else if (inputString.startsWith("sp+"))//setpoint offset
+    {
+      ctlparams.sp += 0.05;
+    }
+    else if (inputString.startsWith("sp-"))//setpoint offset
+    {
+      ctlparams.sp -= 0.05;
+    }
+    else if (inputString.startsWith("si+"))//setpoint offset
+    {
+      ctlparams.si += 0.002;
+    }
+    else if (inputString.startsWith("si-"))//setpoint offset
+    {
+      ctlparams.si -= 0.002;
+    }
+    else if (inputString.startsWith("sd+"))//setpoint offset
+    {
+      ctlparams.sd += 0.001;
+    }
+    else if (inputString.startsWith("sd-"))//setpoint offset
+    {
+      ctlparams.sd -= 0.001;
+    }
+
     // clear the string:
     inputString = "";
     stringComplete = false;
 
-    sPID.SetTunings(ctlparams.sp, ctlparams.si, ctlparams.sd);
     myPID.SetTunings(ctlparams.kp, ctlparams.ki, ctlparams.kd);
+    sPID.SetTunings(ctlparams.sp, ctlparams.si, ctlparams.sd);
     EEPROM.put(0, ctlparams);
   }
 }
