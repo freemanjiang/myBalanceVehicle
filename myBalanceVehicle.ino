@@ -125,7 +125,7 @@ void setup() {
   myPID.SetMode(AUTOMATIC);
 
   sPID.SetTunings(ctlparams.sp, ctlparams.si, ctlparams.sd);
-  sPID.SetOutputLimits(-100, 100);
+  sPID.SetOutputLimits(-255, 255);
   sPID.SetSampleTime(100);
   sPID.SetMode(AUTOMATIC);
 
