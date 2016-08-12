@@ -101,8 +101,6 @@ void wheelR(void)
 // ================================================================
 // ===                      INITIAL SETUP                       ===
 // ================================================================
-
-
 void setup() {
   EEPROM.get(0, ctlparams);
 
@@ -174,16 +172,22 @@ void setup() {
     // ERROR!
   }
 }
-unsigned long lastt1 = 0;
-unsigned long lastshow = 0;
+unsigned long lastVelocityMesure = 0;
+unsigned long lastShowState = 0;
 unsigned long lastParamShow = 0;
-int lastCount = 0;
+int lastCountR = 0;
+int lastCountL = 0;
 double angle = 0;
-int CountDelta = 0;
+int CountDeltaR = 0;
+int CountDeltaL = 0;
 
 void loop() {
   //get yaw pitch roll
-  if (!dmpReady) return;
+  if (!dmpReady)
+  {
+    Serial1.println("dmp Not Ready");
+    return;
+  }
   while (!mpuInterrupt && fifoCount < packetSize) {
   }
   mpuInterrupt = false;
@@ -203,15 +207,17 @@ void loop() {
   }
 
   //motors control
-  if (millis() - lastt1 >= 100)//100ms
+  if (millis() - lastVelocityMesure >= 100)//100ms
   {
-    lastt1 = millis();
-    CountDelta = countR - lastCount;
-    lastCount = countR;
+    lastVelocityMesure = millis();
+    CountDeltaR = countR - lastCountR;
+    lastCountR = countR;
+    CountDeltaL = countL - lastCountL;
+    lastCountL = countL;
   }
-  if (millis() - lastshow >= 600)
+  if (millis() - lastShowState >= 1000)
   {
-    lastshow = millis();
+    lastShowState = millis();
     Serial1.print(Setpoints);
     Serial1.print("\tO=");
     Serial1.print(Output);
@@ -246,7 +252,7 @@ void loop() {
   }
 
   Setpoints = velocity;
-  Inputs = CountDelta;
+  Inputs = CountDeltaR + CountDeltaL;
   if (ctlparams.speedPidOn)
   {
     sPID.Compute();
