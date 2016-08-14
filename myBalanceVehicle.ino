@@ -31,14 +31,14 @@ struct ControlParams {
 double Setpoint, Input, Output;
 double Setpoints, Inputs, Outputs;
 int velocity = 0;
-unsigned int dead_zone = 10;
+unsigned int dead_zone = 20;
 int finalOutput;
 unsigned int show1 = 1;
 unsigned int show2 = 1;
 
-double kp = 12.6, ki = 0, kd = 0.135;
-double sp = 0.54, si = 0.0025, sd = 0.0;
-double angle_calibration = -0.95;
+double kp = 10, ki = 0, kd = 0.15;
+double sp = 0.55, si = 0.25, sd = 0.0;
+double angle_calibration = -0.4;
 ControlParams ctlparams = {
   kp, ki, kd,
   sp, si, sd,
