@@ -24,12 +24,16 @@ struct ControlParams {
   double sd;
   double angle_calibration;
   int speedPidOn;//1:on   0:off
+  unsigned int dead_zone;
 };
 
 double Setpoint, Input, Output;
 double Setpoints, Inputs, Outputs;
 int velocity = 0;
+unsigned int dead_zone = 10;
 int finalOutput;
+unsigned int show1 = 1;
+unsigned int show2 = 1;
 
 double kp = 12.6, ki = 0, kd = 0.135;
 double sp = 0.54, si = 0.0025, sd = 0.0;
@@ -38,7 +42,7 @@ ControlParams ctlparams = {
   kp, ki, kd,
   sp, si, sd,
   angle_calibration,
-  1
+  1, dead_zone
 };
 float value = 0.0;
 String inputString = "";         // a string to hold incoming data
@@ -125,8 +129,8 @@ void setup() {
   myPID.SetMode(AUTOMATIC);
 
   sPID.SetTunings(ctlparams.sp, ctlparams.si, ctlparams.sd);
-  sPID.SetOutputLimits(-255, 255);
-  sPID.SetSampleTime(100);
+  sPID.SetOutputLimits(-190, 190);//范围小于Setpoint的范围，否则，速度环积分饱和后，无法通过Setpoint来消除积分。
+  sPID.SetSampleTime(50);
   sPID.SetMode(AUTOMATIC);
 
   // join I2C bus (I2Cdev library doesn't do this automatically)
@@ -207,7 +211,7 @@ void loop() {
   }
 
   //motors control
-  if (millis() - lastVelocityMesure >= 100)//100ms
+  if (millis() - lastVelocityMesure >= 50)
   {
     lastVelocityMesure = millis();
     CountDeltaR = countR - lastCountR;
@@ -215,73 +219,87 @@ void loop() {
     CountDeltaL = countL - lastCountL;
     lastCountL = countL;
   }
-  if (millis() - lastShowState >= 1000)
+  if (millis() - lastShowState >= 500)
   {
     lastShowState = millis();
-    Serial1.print(Setpoints);
-    Serial1.print("\tO=");
-    Serial1.print(Output);
-    Serial1.print("\tI=");
-    Serial1.print(Input);//angle
-    Serial1.print("\tis=");
-    Serial1.print(Inputs);
-    Serial1.print("\tos=");
-    Serial1.print(Outputs);
-    Serial1.print("\tfo=");
-    Serial1.println(finalOutput);
+    if (show1)
+    {
+      Serial1.print(Setpoints);
+      Serial1.print("\tO=");
+      Serial1.print(Output);
+      Serial1.print("\tI=");
+      Serial1.print(Input);//angle
+      Serial1.print("\tis=");
+      Serial1.print(Inputs);
+      Serial1.print("\tos=");
+      Serial1.print(Outputs);
+      Serial1.print("\tfo=");
+      Serial1.println(finalOutput);
+    }
   }
   if (millis() - lastParamShow >= 3000)//3000ms
   {
     lastParamShow = millis();
-    EEPROM.get(0, ctlparams);
-    Serial1.print(ctlparams.kp, 5);
-    Serial1.print(',');
-    Serial1.print(ctlparams.ki, 5);
-    Serial1.print(',');
-    Serial1.print(ctlparams.kd, 5);
-    Serial1.print('\t');
-    Serial1.print(ctlparams.sp, 5);
-    Serial1.print(',');
-    Serial1.print(ctlparams.si, 5);
-    Serial1.print(',');
-    Serial1.print(ctlparams.sd, 5);
-    Serial1.print('\t');
-    Serial1.print(ctlparams.angle_calibration);
-    Serial1.print('\t');
-    Serial1.println(ctlparams.speedPidOn);
+    if (show2)
+    {
+      EEPROM.get(0, ctlparams);
+      Serial1.print(ctlparams.kp, 5);
+      Serial1.print(',');
+      Serial1.print(ctlparams.ki, 5);
+      Serial1.print(',');
+      Serial1.print(ctlparams.kd, 5);
+      Serial1.print('\t');
+      Serial1.print(ctlparams.sp, 5);
+      Serial1.print(',');
+      Serial1.print(ctlparams.si, 5);
+      Serial1.print(',');
+      Serial1.print(ctlparams.sd, 5);
+      Serial1.print('\t');
+      Serial1.print(ctlparams.angle_calibration);
+      Serial1.print('\t');
+      Serial1.println(ctlparams.speedPidOn);
+      Serial1.print('\t');
+      Serial1.println(ctlparams.dead_zone);
+    }
   }
 
-  Setpoints = velocity;
   Inputs = CountDeltaR + CountDeltaL;
-  if (ctlparams.speedPidOn)
-  {
-    sPID.Compute();
-  }
-  else
-  {
-    Outputs = 0;
-  }
-
-  Setpoint = 0;
   Input = angle;
-  myPID.Compute();
-  //  Serial.print(Output);
-  //  Serial.print("+");
-  //  Serial.print(Output);
+  Setpoints = velocity;
+  Setpoint = 0;
 
-  finalOutput = Output + Outputs;
-
-  if (finalOutput > 255)
+  if (angle > -60 && angle < 60)
   {
-    finalOutput = 255;
+    if (ctlparams.speedPidOn)
+    {
+      sPID.Compute();
+    }
+    else
+    {
+      Outputs = 0;
+    }
+
+    myPID.Compute();
+    //  Serial.print(Output);
+    //  Serial.print("+");
+    //  Serial.print(Output);
+
+    finalOutput = Output + Outputs;
+
+    //Motor's PWM dead zone
+    if (finalOutput > 0)
+    {
+      finalOutput += ctlparams.dead_zone;
+    }
+    else if (Output < 0)
+    {
+      finalOutput -= ctlparams.dead_zone;
+    }
+
+    finalOutput = constrain(finalOutput, -255, 255);
   }
-  else if (finalOutput < -255)
-  {
-    finalOutput = -255;
-  }
-
-  if (angle > 60 || angle < -60)
-  {
+  else// (angle > 60 || angle < -60)
+  { //倒下后电机停转，并且不计算PID（此状态下PID不积分）
     finalOutput = 0;
   }
 
@@ -342,6 +360,32 @@ void loop() {
     else if (inputString.startsWith("spid="))//setpoint offset
     {
       ctlparams.speedPidOn = (int)value;
+    }
+    else if (inputString.startsWith("dz="))//setpoint offset
+    {
+      ctlparams.dead_zone = (unsigned int)value;
+    }
+    else if (inputString.startsWith("show1="))//setpoint offset
+    {
+      if ((unsigned int)value == 1)
+      {
+        show1 = 1;
+      }
+      else
+      {
+        show1 = 0;
+      }
+    }
+    else if (inputString.startsWith("show2="))//setpoint offset
+    {
+      if ((unsigned int)value == 1)
+      {
+        show2 = 1;
+      }
+      else
+      {
+        show2 = 0;
+      }
     }
     else if (inputString.startsWith("v+"))//setpoint offset
     {
