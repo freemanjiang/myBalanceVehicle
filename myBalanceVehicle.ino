@@ -1,4 +1,4 @@
-//L298N 模块供电电源7.42V， L298N的5V输出作为其他电路逻辑电源。
+//L298N 模块供电电源12V， L298N的5V输出作为其他电路逻辑电源。
 #include <EEPROM.h>
 
 #include <PinChangeInterrupt.h>
