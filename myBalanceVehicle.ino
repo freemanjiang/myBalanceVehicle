@@ -89,29 +89,146 @@ void dmpDataReady() {
   mpuInterrupt = true;
 }
 
-void wheelL(void)
-{
-  if (digitalRead(WHEEL_L_IN1))
-  {
-    countL++;
-  }
-  else
-  {
-    countL--;
-  }
-}
+/////////////////begin Encoder/////////////////////
+typedef struct {
+  volatile uint8_t       pinA;
+  volatile uint8_t       pinB;
+  uint8_t                state;
+  int32_t                position;
+} Encoder_internal_state_t;
 
-void wheelR(void)
+#define ENCODER_ARGLIST_SIZE 4
+class Encoder
 {
-  if (digitalRead(WHEEL_R_IN2))
-  {
-    countR++;
-  }
-  else
-  {
-    countR--;
-  }
-}
+  public:
+    Encoder(uint8_t pin1, uint8_t pin2) {
+      pinMode(pin1, INPUT_PULLUP);
+      pinMode(pin2, INPUT_PULLUP);
+      encoder.pinA = pin1;
+      encoder.pinB = pin2;
+      encoder.position = 0;
+      // allow time for a passive R-C filter to charge
+      // through the pullup resistors, before reading
+      // the initial state
+      delayMicroseconds(2000);
+      uint8_t s = 0;
+      if (digitalRead(encoder.pinA) & 0x1) s |= 1;
+      if (digitalRead(encoder.pinB) & 0x2) s |= 2;
+      encoder.state = s;
+      attach_interrupt(pin1, &encoder);
+      attach_interrupt(pin2, &encoder);
+    }
+
+    inline int32_t read() {
+      noInterrupts();
+      int32_t ret = encoder.position;
+      interrupts();
+      return ret;
+    }
+    inline void write(int32_t p) {
+      noInterrupts();
+      encoder.position = p;
+      interrupts();
+    }
+
+  private:
+    Encoder_internal_state_t encoder;
+  public:
+    static Encoder_internal_state_t * interruptArgs[ENCODER_ARGLIST_SIZE];
+    //                           _______         _______
+    //               Pin1 ______|       |_______|       |______ Pin1
+    // negative <---         _______         _______         __      --> positive
+    //               Pin2 __|       |_______|       |_______|   Pin2
+
+    //  new   new   old   old
+    //  pin2  pin1  pin2  pin1  Result
+    //  ----  ----  ----  ----  ------
+    //  0   0   0   0   no movement
+    //  0   0   0   1   +1
+    //  0   0   1   0   -1
+    //  0   0   1   1   +2  (assume pin1 edges only)
+    //  0   1   0   0   -1
+    //  0   1   0   1   no movement
+    //  0   1   1   0   -2  (assume pin1 edges only)
+    //  0   1   1   1   +1
+    //  1   0   0   0   +1
+    //  1   0   0   1   -2  (assume pin1 edges only)
+    //  1   0   1   0   no movement
+    //  1   0   1   1   -1
+    //  1   1   0   0   +2  (assume pin1 edges only)
+    //  1   1   0   1   -1
+    //  1   1   1   0   +1
+    //  1   1   1   1   no movement
+
+    // update() is not meant to be called from outside Encoder,
+    // but it is public to allow static interrupt routines.
+    // DO NOT call update() directly from sketches.
+    static void update(Encoder_internal_state_t *encoder) {
+      uint8_t s = encoder->state & 3;
+      if (digitalRead(encoder->pinA)) s |= 4;
+      if (digitalRead(encoder->pinB)) s |= 8;
+      switch (s) {
+        case 0: case 5: case 10: case 15:
+          break;
+        case 1: case 7: case 8: case 14:
+          encoder->position++; break;
+        case 2: case 4: case 11: case 13:
+          encoder->position--; break;
+        case 3: case 12:
+          encoder->position += 2; break;
+        default:
+          encoder->position -= 2; break;
+      }
+      encoder->state = (s >> 2);
+    }
+
+  private:
+    static uint8_t attach_interrupt(uint8_t pin, Encoder_internal_state_t *state)
+    {
+      switch (pin) {
+        case WHEEL_L_PCINT_PIN_A:
+          interruptArgs[0] = state;
+          attachPCINT(digitalPinToPCINT(pin), isr0, CHANGE);//here using Pin Change Interrupt
+          break;
+        case WHEEL_L_PCINT_PIN_B:
+          interruptArgs[1] = state;
+          attachPCINT(digitalPinToPCINT(pin), isr1, CHANGE);
+          break;
+        case WHEEL_R_PCINT_PIN_A:
+          interruptArgs[2] = state;
+          attachPCINT(digitalPinToPCINT(pin), isr2, CHANGE);
+          break;
+        case WHEEL_R_PCINT_PIN_B:
+          interruptArgs[3] = state;
+          attachPCINT(digitalPinToPCINT(pin), isr3, CHANGE);
+          break;
+        default:
+          return 0;
+      }
+      return 1;
+    }
+    static void isr0(void)
+    {
+      update(interruptArgs[0]);
+    }
+    static void isr1(void)
+    {
+      update(interruptArgs[1]);
+    }
+    static void isr2(void)
+    {
+      update(interruptArgs[2]);
+    }
+    static void isr3(void)
+    {
+      update(interruptArgs[3]);
+    }
+};
+Encoder_internal_state_t* Encoder::interruptArgs[] = {NULL, NULL, NULL, NULL};
+Encoder myEncL(WHEEL_L_PCINT_PIN_A, WHEEL_L_PCINT_PIN_B);
+Encoder myEncR(WHEEL_R_PCINT_PIN_A, WHEEL_R_PCINT_PIN_B);
+/////////////////end of Encoder////////////////////
+
 
 // ================================================================
 // ===                      INITIAL SETUP                       ===
@@ -127,15 +244,15 @@ void setup() {
   pinMode(WHEEL_R_IN2, OUTPUT); //WHEEL R
   pinMode(WHEEL_R_PWM, OUTPUT); //WHEEL R enable, pwm
 
-  pinMode(WHEEL_L_PCINT_PIN_A, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt
-  pinMode(WHEEL_L_PCINT_PIN_B, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt
-  pinMode(WHEEL_R_PCINT_PIN_A, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt  
-  pinMode(WHEEL_R_PCINT_PIN_B, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt
+  //  pinMode(WHEEL_L_PCINT_PIN_A, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt
+  //  pinMode(WHEEL_L_PCINT_PIN_B, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt
+  //  pinMode(WHEEL_R_PCINT_PIN_A, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt
+  //  pinMode(WHEEL_R_PCINT_PIN_B, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt
 
-  attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN_A), wheelL, CHANGE);
-  attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN_B), wheelL, CHANGE);
-  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN_A), wheelR, CHANGE);
-  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN_B), wheelR, CHANGE);
+  //  attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN_A), wheelL, CHANGE);
+  //  attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN_B), wheelL, CHANGE);
+  //  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN_A), wheelR, CHANGE);
+  //  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN_B), wheelR, CHANGE);
 
   Setpoint = 0;
   myPID.SetTunings(ctlparams.kp, ctlparams.ki, ctlparams.kd);
@@ -229,6 +346,8 @@ void loop() {
   if (millis() - lastVelocityMesure >= 50)
   {
     lastVelocityMesure = millis();
+    countR = myEncR.read();
+    countL = myEncL.read();
     CountDeltaR = countR - lastCountR;
     lastCountR = countR;
     CountDeltaL = countL - lastCountL;
