@@ -121,17 +121,21 @@ void setup() {
 
   pinMode(WHEEL_L_IN1, OUTPUT); //WHEEL L
   pinMode(WHEEL_L_IN2, OUTPUT); //WHEEL L
-  pinMode(5, OUTPUT); //WHEEL L enable, pwm
+  pinMode(WHEEL_L_PWM, OUTPUT); //WHEEL L enable, pwm
 
   pinMode(WHEEL_R_IN1, OUTPUT);//WHEEL R
   pinMode(WHEEL_R_IN2, OUTPUT); //WHEEL R
-  pinMode(6, OUTPUT); //WHEEL R enable, pwm
+  pinMode(WHEEL_R_PWM, OUTPUT); //WHEEL R enable, pwm
 
-  pinMode(WHEEL_L_PCINT_PIN_A, INPUT_PULLUP);//one wheel speed detect , Pin Change Interrupt
-  pinMode(WHEEL_R_PCINT_PIN_A, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
+  pinMode(WHEEL_L_PCINT_PIN_A, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt
+  pinMode(WHEEL_L_PCINT_PIN_B, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt
+  pinMode(WHEEL_R_PCINT_PIN_A, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt  
+  pinMode(WHEEL_R_PCINT_PIN_B, INPUT_PULLUP);// wheel speed detect , Pin Change Interrupt
 
-  attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN_A), wheelL, RISING);
-  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN_A), wheelR, RISING);
+  attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN_A), wheelL, CHANGE);
+  attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN_B), wheelL, CHANGE);
+  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN_A), wheelR, CHANGE);
+  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN_B), wheelR, CHANGE);
 
   Setpoint = 0;
   myPID.SetTunings(ctlparams.kp, ctlparams.ki, ctlparams.kd);
@@ -320,21 +324,21 @@ void loop() {
   { //backward
     digitalWrite(WHEEL_L_IN1, LOW);
     digitalWrite(WHEEL_L_IN2, HIGH);
-    analogWrite(5, -finalOutput);
+    analogWrite(WHEEL_L_PWM, -finalOutput);
 
     digitalWrite(WHEEL_R_IN1, HIGH);
     digitalWrite(WHEEL_R_IN2, LOW);
-    analogWrite(6, -finalOutput);
+    analogWrite(WHEEL_R_PWM, -finalOutput);
   }
   else
   { //forwared
     digitalWrite(WHEEL_L_IN1, HIGH);
     digitalWrite(WHEEL_L_IN2, LOW);
-    analogWrite(5, finalOutput);
+    analogWrite(WHEEL_L_PWM, finalOutput);
 
     digitalWrite(WHEEL_R_IN1, LOW);
     digitalWrite(WHEEL_R_IN2, HIGH);
-    analogWrite(6, finalOutput);
+    analogWrite(WHEEL_R_PWM, finalOutput);
   }
 
   if (stringComplete) {
