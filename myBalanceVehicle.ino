@@ -52,9 +52,19 @@ PID myPID(&Input, &Output,   &Setpoint, ctlparams.kp, ctlparams.ki, ctlparams.kd
 PID sPID(&Inputs, &Outputs, &Setpoints, ctlparams.sp, ctlparams.si, ctlparams.sd, REVERSE);
 int countL = 0;
 int countR = 0;
+
 #define MPU_6050_INTERRUPT_PIN 7  // use pin 2 on Arduino Uno & most boards// On Pro Micro, move it to pin 7.
-#define WHEEL_L_PCINT_PIN 8
-#define WHEEL_R_PCINT_PIN 15
+#define WHEEL_L_PCINT_PIN_A 8
+#define WHEEL_L_PCINT_PIN_B 14
+#define WHEEL_R_PCINT_PIN_A 15
+#define WHEEL_R_PCINT_PIN_B 16
+
+#define WHEEL_L_IN1 A1
+#define WHEEL_L_IN2 A0
+#define WHEEL_L_PWM 5
+#define WHEEL_R_IN1 9
+#define WHEEL_R_IN2 10
+#define WHEEL_R_PWM 6
 
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
@@ -81,7 +91,7 @@ void dmpDataReady() {
 
 void wheelL(void)
 {
-  if (digitalRead(14))
+  if (digitalRead(WHEEL_L_IN1))
   {
     countL++;
   }
@@ -93,7 +103,7 @@ void wheelL(void)
 
 void wheelR(void)
 {
-  if (digitalRead(10))
+  if (digitalRead(WHEEL_R_IN2))
   {
     countR++;
   }
@@ -109,19 +119,19 @@ void wheelR(void)
 void setup() {
   EEPROM.get(0, ctlparams);
 
-  pinMode(14, OUTPUT); //WHEEL L
-  pinMode(16, OUTPUT); //WHEEL L
+  pinMode(WHEEL_L_IN1, OUTPUT); //WHEEL L
+  pinMode(WHEEL_L_IN2, OUTPUT); //WHEEL L
   pinMode(5, OUTPUT); //WHEEL L enable, pwm
 
-  pinMode(9, OUTPUT);//WHEEL R
-  pinMode(10, OUTPUT); //WHEEL R
+  pinMode(WHEEL_R_IN1, OUTPUT);//WHEEL R
+  pinMode(WHEEL_R_IN2, OUTPUT); //WHEEL R
   pinMode(6, OUTPUT); //WHEEL R enable, pwm
 
-  pinMode(WHEEL_L_PCINT_PIN, INPUT_PULLUP);//one wheel speed detect , Pin Change Interrupt
-  pinMode(WHEEL_R_PCINT_PIN, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
+  pinMode(WHEEL_L_PCINT_PIN_A, INPUT_PULLUP);//one wheel speed detect , Pin Change Interrupt
+  pinMode(WHEEL_R_PCINT_PIN_A, INPUT_PULLUP);//another wheel speed detect , Pin Change Interrupt
 
-  attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN), wheelL, RISING);
-  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN), wheelR, RISING);
+  attachPCINT(digitalPinToPCINT(WHEEL_L_PCINT_PIN_A), wheelL, RISING);
+  attachPCINT(digitalPinToPCINT(WHEEL_R_PCINT_PIN_A), wheelR, RISING);
 
   Setpoint = 0;
   myPID.SetTunings(ctlparams.kp, ctlparams.ki, ctlparams.kd);
@@ -308,22 +318,22 @@ void loop() {
   //  Serial.println(finalOutput);
   if (finalOutput < 0)
   { //backward
-    digitalWrite(14, LOW);
-    digitalWrite(16, HIGH);
+    digitalWrite(WHEEL_L_IN1, LOW);
+    digitalWrite(WHEEL_L_IN2, HIGH);
     analogWrite(5, -finalOutput);
 
-    digitalWrite(9, HIGH);
-    digitalWrite(10, LOW);
+    digitalWrite(WHEEL_R_IN1, HIGH);
+    digitalWrite(WHEEL_R_IN2, LOW);
     analogWrite(6, -finalOutput);
   }
   else
   { //forwared
-    digitalWrite(14, HIGH);
-    digitalWrite(16, LOW);
+    digitalWrite(WHEEL_L_IN1, HIGH);
+    digitalWrite(WHEEL_L_IN2, LOW);
     analogWrite(5, finalOutput);
 
-    digitalWrite(9, LOW);
-    digitalWrite(10, HIGH);
+    digitalWrite(WHEEL_R_IN1, LOW);
+    digitalWrite(WHEEL_R_IN2, HIGH);
     analogWrite(6, finalOutput);
   }
 
